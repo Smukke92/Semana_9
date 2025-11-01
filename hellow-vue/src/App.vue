@@ -1,227 +1,228 @@
-<template>  
+<template>
   <div class="container">
-    <h1>Gestor de tareas</h1>
+    <h1>Gestor de Tareas</h1>
 
-    <!-- Input con v-model -->
-    <input 
-      v-model="newTask" 
-      placeholder="Introduce una tarea" 
-      @keyup.enter="addTask" 
-    />
-    <button @click="addTask">agregar</button>
-
-    <hr />
-
-    <h2>Listado de tareas</h2>
-
-    <!-- v-if / v-else -->
-    <div v-if="tasks.todo.length > 0 || tasks.doing.length > 0 || tasks.done.length > 0">
-
-      <div class="columns">
-        
-        <!-- Columna TO DO -->
-        <div class="column">
-          <h3>To do</h3>
-          <!-- v-for -->
-          <div v-for="task in tasks.todo" :key="task.id" class="task-item">  
-            <button class="task-btn" @click="moveToNext(task.id, 'todo')">
-              {{ task.text }}
-            </button>
-            <button class="arrow-btn" @click="moveToNext(task.id, 'todo')">
-              →
-            </button>
-          </div>
-        </div>
-
-        <!-- Columna DOING -->
-        <div class="column">
-          <h3>Doing</h3>
-          <div v-for="task in tasks.doing" :key="task.id" class="task-item">
-            <button class="doin-task-btn" @click="moveToNext(task.id, 'doing')">
-              {{ task.text }}
-            </button>
-            <button class="doin-arrow-btn" @click="moveToNext(task.id, 'doing')">
-              →
-            </button>
-          </div>
-        </div>
-
-        <!-- Columna DONE -->
-        <div class="column">
-          <h3>Done</h3>
-          <div v-for="task in tasks.done" :key="task.id" class="task-done">
-            {{ task.text }}
-          </div>
-        </div>
-      </div>
+    <!-- Agregar tarea -->
+    <div class="add-task">
+      <input
+        v-model="newTask"
+        type="text"
+        placeholder="Escribe una nueva tarea..."
+      />
+      <button @click="addTask">Agregar</button>
     </div>
 
-    <div v-else>
-      <p>No hay tareas registradas</p>
+    <!-- Resumen -->
+    <div class="summary">
+      <h2>Resumen</h2>
+      <p>Por hacer: {{ summary.todo }}</p>
+      <p>En progreso: {{ summary.doing }}</p>
+      <p>Finalizadas: {{ summary.done }}</p>
+    </div>
+
+    <!-- Columnas de tareas -->
+    <div class="columns">
+      <div class="column">
+        <h2>Por hacer</h2>
+        <ul>
+          <li v-for="task in tasks.todo" :key="task.id">
+            {{ task.title }}
+            <button @click="moveToNext(task.id, task.status)">➡️</button>
+            <button @click="deleteTask(task.id)">🗑️</button>
+          </li>
+        </ul>
+      </div>
+
+      <div class="column">
+        <h2>En progreso</h2>
+        <ul>
+          <li v-for="task in tasks.doing" :key="task.id">
+            {{ task.title }}
+            <button @click="moveToNext(task.id, task.status)">➡️</button>
+            <button @click="deleteTask(task.id)">🗑️</button>
+          </li>
+        </ul>
+      </div>
+
+      <div class="column">
+        <h2>Finalizadas</h2>
+        <ul>
+          <li v-for="task in tasks.done" :key="task.id">
+            {{ task.title }}
+            <button @click="deleteTask(task.id)">🗑️</button>
+          </li>
+        </ul>
+      </div>
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref } from 'vue'
+<script>
+const API_BASE = "http://localhost:3000"; // URL del backend
 
-// Modelo: variables reactivas
-const newTask = ref('')
-const tasks = ref({
-  todo: [],
-  doing: [],
-  done: []
-})
+export default {
+  name: "App",
+  data() {
+    return {
+      newTask: "",
+      tasks: { todo: [], doing: [], done: [] },
+      summary: { todo: 0, doing: 0, done: 0 },
+    };
+  },
+  methods: {
+    // Cargar todas las tareas---
+    async loadAllTasks() {
+      try {
+        const res = await fetch(`${API_BASE}/tasks`);
+        const all = await res.json();
+        const grouped = { todo: [], doing: [], done: [] };
+        all.forEach((t) => {
+          if (!grouped[t.status]) grouped[t.status] = [];
+          grouped[t.status].push(t);
+        });
+        this.tasks = grouped;
+        this.getSummary();
+      } catch (err) {
+        console.error("Error al cargar tareas:", err);
+      }
+    },
 
-let taskIdCounter = 0
+    // Crear nueva tarea---
+    async addTask() {
+      if (!this.newTask.trim()) return;
+      try {
+        const res = await fetch(`${API_BASE}/tasks`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: this.newTask }),
+        });
+        if (res.ok) {
+          this.newTask = "";
+          await this.loadAllTasks();
+        }
+      } catch (err) {
+        console.error("Error al agregar tarea:", err);
+      }
+    },
 
-// ViewModel: lógica del componente
-const addTask = () => {
-  const taskText = newTask.value.trim()
-  if (taskText !== '') {
-    tasks.value.todo.push({
-      id: taskIdCounter++,
-      text: taskText
-    })
-    newTask.value = ''
-  }
-}
+    // Cambiar tarea de estado (todo -> doing -> done)---
+    async moveToNext(id, currentStatus) {
+      const nextMap = { todo: "doing", doing: "done", done: "done" };
+      const next = nextMap[currentStatus] || "todo";
+      try {
+        await fetch(`${API_BASE}/tasks/${id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: next }),
+        });
+        await this.loadAllTasks();
+      } catch (err) {
+        console.error("Error al cambiar estado:", err);
+      }
+    },
 
-const moveToNext = (taskId, currentColumn) => {
-  const taskIndex = tasks.value[currentColumn].findIndex(t => t.id === taskId)
-  const task = tasks.value[currentColumn][taskIndex]
-  
-  // Remover de la columna actual
-  tasks.value[currentColumn].splice(taskIndex, 1)
-  
-  // Agregar a la siguiente columna
-  if (currentColumn === 'todo') {
-    tasks.value.doing.push(task)
-  } else if (currentColumn === 'doing') {
-    tasks.value.done.push(task)
-  }
-}
+    // Eliminar tarea---
+    async deleteTask(id) {
+      try {
+        await fetch(`${API_BASE}/tasks/${id}`, { method: "DELETE" });
+        await this.loadAllTasks();
+      } catch (err) {
+        console.error("Error al eliminar tarea:", err);
+      }
+    },
+
+    // Obtener resumen---
+    async getSummary() {
+      try {
+        const res = await fetch(`${API_BASE}/tasks/summary`);
+        if (res.ok) this.summary = await res.json();
+      } catch (err) {
+        console.error("Error al obtener resumen:", err);
+      }
+    },
+  },
+  mounted() {
+    this.loadAllTasks();
+  },
+};
 </script>
 
-<style scoped>
-.container {
-  max-width: 1200px;
-  margin: 40px auto;
+<style>
+body {
   font-family: Arial, sans-serif;
-  padding: 0 20px;
+  background-color: #f9f9f9;
+  margin: 0;
 }
 
-h1 {
-  text-align: center;
-  font-size: 28px;
+.container {
+  max-width: 900px;
+  margin: 30px auto;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.add-task {
+  display: flex;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
-input {
+.add-task input {
+  flex: 1;
   padding: 8px;
-  width: 60%;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #e5e7eb;
+  font-size: 16px;
 }
 
-button {
-  margin-left: 8px;
-  padding: 8px 12px;
-  border: none;
-  background: #d1d5db;
-  border-radius: 4px;
+.add-task button {
+  padding: 8px 16px;
   cursor: pointer;
 }
 
-button:hover {
-  background: #9ca3af;
-}
-
-hr {
-  border: none;
-  border-top: 1px solid #ccc;
-  margin: 20px 0;
-}
-
-h2 {
-  text-align: center;
-  font-size: 22px;
-  margin-bottom: 20px;
-}
-
-p {
-  text-align: center;
-  color: #666;
-}
-
 .columns {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
 }
 
 .column {
-  border: 2px solid #999;
-  background: #f3f4f6;
-  padding: 12px;
-  border-radius: 4px;
-  min-height: 250px;
+  flex: 1;
+  background: #fafafa;
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.05);
 }
 
-.column h3 {
+.column h2 {
   text-align: center;
-  font-size: 18px;
-  margin-bottom: 12px;
 }
 
-.task-item {
+.column ul {
+  list-style: none;
+  padding: 0;
+}
+
+.column li {
+  background: #fff;
+  margin: 5px 0;
+  padding: 8px;
+  border-radius: 8px;
   display: flex;
-  gap: 6px;
-  margin-bottom: 6px;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #ddd;
 }
 
-.task-btn {
-  flex: 1;
-  background: #fca5a5;
-  text-align: left;
-  padding: 8px 10px;
-  margin: 0;
-}
-.doin-task-btn {
-  flex: 1;
-  background: #6a72e6ff;
-  text-align: left;
-  padding: 8px 10px;
-  margin: 0;
-}
-.doin-arrow-btn{
-  background: #6a72e6ff;
-  padding: 8px 12px;
-  margin: 0;
-  font-size: 16px;
+.column button {
+  margin-left: 5px;
+  cursor: pointer;
 }
 
-.task-btn:hover {
-  background: #f87171;
-}
-
-.arrow-btn {
-  background: #fca5a5;
-  padding: 8px 12px;
-  margin: 0;
-  font-size: 16px;
-}
-
-.arrow-btn:hover {
-  background: #f87171;
-}
-
-.task-done {
-  background: #afe9adff;
-  padding: 8px 10px;
-  border-radius: 4px;
-  margin-bottom: 6px;
+.summary {
+  margin: 20px 0;
+  background: #f0f0f0;
+  padding: 10px;
+  border-radius: 8px;
 }
 </style>
