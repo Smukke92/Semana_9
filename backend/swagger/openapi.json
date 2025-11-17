@@ -1,0 +1,168 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Task API",
+    "version": "1.0.0",
+    "description": "API para gestionar tareas (todo, doing, done). Compatible con Node + Express."
+  },
+  "servers": [
+    { "url": "http://localhost:3000" }
+  ],
+  "tags": [
+    { "name": "Tasks", "description": "Operaciones relacionadas con tareas" }
+  ],
+  "paths": {
+    "/tasks": {
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "Obtener todas las tareas",
+        "responses": {
+          "200": {
+            "description": "Lista de tareas",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Task" } } } }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Tasks"],
+        "summary": "Crear una nueva tarea (estado por defecto: todo)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateTaskDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Tarea creada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
+          "400": { "description": "Datos inválidos" }
+        }
+      }
+    },
+
+    "/tasks/summary": {
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "Obtener resumen de tareas",
+        "responses": {
+          "200": {
+            "description": "Resumen de tareas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "todo": { "type": "integer" },
+                    "doing": { "type": "integer" },
+                    "done": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/tasks/{id}": {
+      "get": {
+        "tags": ["Tasks"],
+        "summary": "Obtener tarea por ID",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Tarea encontrada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
+          "404": { "description": "Tarea no encontrada" }
+        }
+      },
+      "put": {
+        "tags": ["Tasks"],
+        "summary": "Actualizar tarea completa",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UpdateTaskDto" } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tarea actualizada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
+          "404": { "description": "Tarea no encontrada" }
+        }
+      },
+      "delete": {
+        "tags": ["Tasks"],
+        "summary": "Eliminar tarea por ID",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Tarea eliminada correctamente" },
+          "404": { "description": "Tarea no encontrada" }
+        }
+      }
+    },
+
+    "/tasks/{id}/status": {
+      "patch": {
+        "tags": ["Tasks"],
+        "summary": "Cambiar solo el estado de una tarea",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["todo", "doing", "done"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Estado actualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Task" } } } },
+          "400": { "description": "Estado inválido" },
+          "404": { "description": "Tarea no encontrada" }
+        }
+      }
+    }
+  },
+
+  "components": {
+    "schemas": {
+      "Task": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["todo", "doing", "done"] },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "CreateTaskDto": {
+        "type": "object",
+        "required": ["title"],
+        "properties": { "title": { "type": "string" }, "description": { "type": "string" } }
+      },
+      "UpdateTaskDto": {
+        "type": "object",
+        "required": ["title", "status"],
+        "properties": {
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "status": { "type": "string", "enum": ["todo", "doing", "done"] }
+        }
+      }
+    }
+  }
+}
